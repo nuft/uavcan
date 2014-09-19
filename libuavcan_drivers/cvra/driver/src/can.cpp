@@ -1,36 +1,38 @@
 #include <uavcan_cvra/can.hpp>
 #include <stdlib.h>
 
+using namespace uavcan;
+
 namespace uavcan_cvra
 {
 
 /* CanIface */
 
-uavcan::int16_t CanIface::send(const uavcan::CanFrame& frame, uavcan::MonotonicTime tx_deadline, uavcan::CanIOFlags flags)
+int16_t CanIface::send(const CanFrame& frame, MonotonicTime tx_deadline, CanIOFlags flags)
 {
     printf("can send\n");
     return 0;
 }
 
-uavcan::int16_t CanIface::receive(uavcan::CanFrame& out_frame, uavcan::MonotonicTime& out_ts_monotonic, uavcan::UtcTime& out_ts_utc, uavcan::CanIOFlags& out_flags)
+int16_t CanIface::receive(CanFrame& out_frame, MonotonicTime& out_ts_monotonic, UtcTime& out_ts_utc, CanIOFlags& out_flags)
 {
     printf("can receive\n");
     return 0;
 }
 
-uavcan::int16_t CanIface::configureFilters(const uavcan::CanFilterConfig* filter_configs, uavcan::uint16_t num_configs)
+int16_t CanIface::configureFilters(const CanFilterConfig* filter_configs, uint16_t num_configs)
 {
     printf("can configureFilters\n");
     return 0;
 }
 
-uavcan::uint16_t CanIface::getNumFilters()
+uint16_t CanIface::getNumFilters()
 {
     printf("can getNumFilters\n");
     return 0;
 }
 
-uavcan::uint64_t CanIface::getErrorCount()
+uint64_t CanIface::getErrorCount()
 {
     printf("can getErrorCount\n");
     return 0;
@@ -38,19 +40,19 @@ uavcan::uint64_t CanIface::getErrorCount()
 
 /* CanDriver */
 
-uavcan::int16_t CanDriver::select(uavcan::CanSelectMasks& inout_masks, const uavcan::MonotonicTime blocking_deadline)
+int16_t CanDriver::select(CanSelectMasks& inout_masks, const MonotonicTime blocking_deadline)
 {
     printf("can select\n");
     return 0;
 }
 
-CanIface* CanDriver::getIface(uavcan::uint8_t iface_index)
+CanIface* CanDriver::getIface(uint8_t iface_index)
 {
     printf("can getIface\n");
     return NULL;
 }
 
-uavcan::uint8_t CanDriver::getNumIfaces() const
+uint8_t CanDriver::getNumIfaces() const
 {
     return 1;
 }
