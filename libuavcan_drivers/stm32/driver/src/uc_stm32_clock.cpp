@@ -14,6 +14,7 @@
 /*
  * Timer instance
  */
+#if UAVCAN_STM32_CHIBIOS
 #define TIMX                    UAVCAN_STM32_GLUE2(TIM, UAVCAN_STM32_TIMER_NUMBER)
 #define TIMX_IRQn               UAVCAN_STM32_GLUE3(TIM, UAVCAN_STM32_TIMER_NUMBER, _IRQn)
 #define TIMX_IRQHandler         UAVCAN_STM32_GLUE3(TIM, UAVCAN_STM32_TIMER_NUMBER, _IRQHandler)
@@ -26,6 +27,26 @@
 # define TIMX_INPUT_CLOCK       STM32_TIMCLK1
 #else
 # error "This UAVCAN_STM32_TIMER_NUMBER is not supported yet"
+#endif
+
+#elif UAVCAN_STM32_CVRA_PLATFORM
+# include <libopencm3/stm32/rcc.h>
+# include <libopencm3/dispatch/nvic.h>
+# include <libopencm3/stm32/timer.h>
+
+# if UAVCAN_STM32_TIMER_NUMBER >= 2 && UAVCAN_STM32_TIMER_NUMBER <= 7
+// on apb1 for stm32f4: ftimer = 2*fapb if apb_prescaler > 1, ftimer = fapb otherwise
+#  define TIMX_INPUT_CLOCK  (rcc_ppre1_frequency*2) // TODO doesn't work in all configurations
+#  define TIMX_RCC          UAVCAN_STM32_GLUE2(RCC_TIM, UAVCAN_STM32_TIMER_NUMBER)
+#  define TIMX_RST          UAVCAN_STM32_GLUE2(RST_TIM, UAVCAN_STM32_TIMER_NUMBER)
+#  define TIMX_IRQ          UAVCAN_STM32_GLUE3(NVIC_TIM, UAVCAN_STM32_TIMER_NUMBER, _IRQ)
+#  define TIMX_BASE         UAVCAN_STM32_GLUE2(TIM, UAVCAN_STM32_TIMER_NUMBER)
+#  define TIMX_IRQHandler   UAVCAN_STM32_GLUE3(tim, UAVCAN_STM32_TIMER_NUMBER, _isr)
+# else
+#  error "This UAVCAN_STM32_TIMER_NUMBER is not supported yet"
+# endif
+#else
+# error "Unknwon OS"
 #endif
 
 namespace uavcan_stm32
@@ -66,6 +87,7 @@ void init()
     }
     initialized = true;
 
+#if UAVCAN_STM32_CHIBIOS
     // Power-on and reset
     TIMX_RCC_ENR |= TIMX_RCC_ENR_MASK;
     TIMX_RCC_RSTR |=  TIMX_RCC_RSTR_MASK;
@@ -86,19 +108,55 @@ void init()
     TIMX->EGR  = TIM_EGR_UG;     // Reload immediately
     TIMX->DIER = TIM_DIER_UIE;
     TIMX->CR1  = TIM_CR1_CEN;    // Start
+
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    rcc_periph_clock_enable(TIMX_RCC);
+    rcc_periph_reset_pulse(TIMX_RST);
+    nvic_enable_irq(TIMX_IRQ);
+    nvic_set_priority(TIMX_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+
+    // same config as above
+    TIM_ARR(TIMX_BASE)  = 0xffff;
+    TIM_PSC(TIMX_BASE)  = (TIMX_INPUT_CLOCK / 1000000) - 1;
+    TIM_CR1(TIMX_BASE)  = TIM_CR1_URS;
+    TIM_SR(TIMX_BASE)   = 0;
+    TIM_EGR(TIMX_BASE)  = TIM_EGR_UG;
+    TIM_DIER(TIMX_BASE) = TIM_DIER_UIE;
+    TIM_CR1(TIMX_BASE)  = TIM_CR1_CEN;
+#endif
 }
 
 static uavcan::uint64_t sampleUtcFromCriticalSection()
 {
     UAVCAN_ASSERT(initialized);
+#if UAVCAN_STM32_CHIBIOS
     UAVCAN_ASSERT(TIMX->DIER & TIM_DIER_UIE);
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    UAVCAN_ASSERT(TIM_DIER(TIMX_BASE) & TIM_DIER_UIE);
+#endif
 
     volatile uavcan::uint64_t time = time_utc;
+#if UAVCAN_STM32_CHIBIOS
     volatile uavcan::uint32_t cnt = TIMX->CNT;
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    volatile uavcan::uint32_t cnt = TIM_CNT(TIMX_BASE);
+#endif
 
+    bool overflow = false;
+#if UAVCAN_STM32_CHIBIOS
     if (TIMX->SR & TIM_SR_UIF)
     {
         cnt = TIMX->CNT;
+        overflow = true;
+    }
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    if (TIM_SR(TIMX_BASE) & TIM_SR_UIF)
+    {
+        cnt = TIM_CNT(TIMX_BASE);
+        overflow = true;
+    }
+#endif
+    if (overflow) {
         const uavcan::int32_t add = uavcan::int32_t(USecPerOverflow) +
                                     (utc_accumulated_correction_nsec + utc_correction_nsec_per_overflow) / 1000;
         time = uavcan::uint64_t(uavcan::int64_t(time) + add);
@@ -118,12 +176,21 @@ uavcan::MonotonicTime getMonotonic()
         CriticalSectionLocker locker;
 
         volatile uavcan::uint64_t time = time_mono;
+#if UAVCAN_STM32_CHIBIOS
         volatile uavcan::uint32_t cnt = TIMX->CNT;
         if (TIMX->SR & TIM_SR_UIF)
         {
             cnt = TIMX->CNT;
             time += USecPerOverflow;
         }
+#elif UAVCAN_STM32_CVRA_PLATFORM
+        volatile uavcan::uint32_t cnt = TIM_CNT(TIMX_BASE);
+        if (TIM_SR(TIMX_BASE) & TIM_SR_UIF)
+        {
+            cnt = TIM_CNT(TIMX_BASE);
+            time += USecPerOverflow;
+        }
+#endif
         usec = time + cnt;
 
 #if !NDEBUG
@@ -309,7 +376,11 @@ UAVCAN_STM32_IRQ_HANDLER(TIMX_IRQHandler)
 {
     UAVCAN_STM32_IRQ_PROLOGUE();
 
+#if UAVCAN_STM32_CHIBIOS
     TIMX->SR = 0;
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    TIM_SR(TIMX_BASE) = 0;
+#endif
 
     using namespace uavcan_stm32::clock;
     UAVCAN_ASSERT(initialized);
