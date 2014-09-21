@@ -214,6 +214,9 @@ void BusEvent::signalFromInterrupt()
 
 #elif UAVCAN_STM32_CVRA_PLATFORM
 
+/*
+ * BusEvent
+ */
 BusEvent::BusEvent(CanDriver& can_driver)
 {
     (void) can_driver;
@@ -244,6 +247,19 @@ void BusEvent::signalFromInterrupt()
 void BusEvent::signal()
 {
     os_semaphore_release(&semaphore_);
+}
+
+/*
+ * Mutex
+ */
+void Mutex::lock()
+{
+    os_mutex_take(&mutex_);
+}
+
+void Mutex::unlock()
+{
+    os_mutex_release(&mutex_);
 }
 
 #endif

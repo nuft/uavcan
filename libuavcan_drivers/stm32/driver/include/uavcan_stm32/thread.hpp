@@ -108,10 +108,19 @@ public:
     void signalFromInterrupt();
 };
 
+class Mutex
+{
+    mutex_t mutex_;
+
+public:
+    void lock();
+    void unlock();
+};
+
 #endif
 
 
-#if UAVCAN_STM32_CHIBIOS
+#if UAVCAN_STM32_CHIBIOS || UAVCAN_STM32_CVRA_PLATFORM
 
 class MutexLocker
 {
