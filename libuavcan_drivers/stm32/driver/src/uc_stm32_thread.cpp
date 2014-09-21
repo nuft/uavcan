@@ -221,7 +221,7 @@ BusEvent::BusEvent(CanDriver& can_driver)
 {
     (void) can_driver;
 
-    os_semaphore_init(&semaphore_);
+    os_semaphore_init(&semaphore_, 0);
 }
 
 bool BusEvent::wait(uavcan::MonotonicDuration duration)
