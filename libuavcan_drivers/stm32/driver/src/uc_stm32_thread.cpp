@@ -212,6 +212,40 @@ void BusEvent::signalFromInterrupt()
     }
 }
 
+#elif UAVCAN_STM32_CVRA_PLATFORM
+
+BusEvent::BusEvent(CanDriver& can_driver)
+{
+    (void) can_driver;
+
+    os_semaphore_init(&semaphore_);
+}
+
+bool BusEvent::wait(uavcan::MonotonicDuration duration)
+{
+    uavcan::int64_t usec = duration.toUSec();
+
+    bool ret;
+    if (usec <= 0) {
+        ret = os_semaphore_try(&semaphore_);
+    } else {
+        /* todo: check if timeout is too big for uint32_t */
+        ret = os_semaphore_try_timeout(&semaphore_, (uint32_t) usec);
+    }
+
+    return ret;
+}
+
+void BusEvent::signalFromInterrupt()
+{
+    os_semaphore_release(&semaphore_);
+}
+
+void BusEvent::signal()
+{
+    os_semaphore_release(&semaphore_);
+}
+
 #endif
 
 }

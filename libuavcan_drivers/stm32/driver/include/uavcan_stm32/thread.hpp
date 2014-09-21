@@ -14,6 +14,9 @@
 # include <cstdio>
 # include <ctime>
 # include <cstring>
+#elif UAVCAN_STM32_CVRA_PLATFORM
+# include <platform-abstractin/threading.h>
+# include <platform-abstractin/semaphore.h>
 #else
 # error "Unknown OS"
 #endif
@@ -85,6 +88,22 @@ public:
     ~BusEvent();
 
     bool wait(uavcan::MonotonicDuration duration);
+
+    void signalFromInterrupt();
+};
+
+#elif UAVCAN_STM32_CVRA_PLATFORM
+
+class BusEvent
+{
+    semaphore_t semaphore_;
+
+public:
+    BusEvent(CanDriver& can_driver);
+
+    bool wait(uavcan::MonotonicDuration duration);
+
+    void signal();
 
     void signalFromInterrupt();
 };
