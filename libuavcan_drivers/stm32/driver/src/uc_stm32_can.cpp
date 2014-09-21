@@ -174,7 +174,7 @@ int CanIface::computeTimings(const uavcan::uint32_t target_bitrate, Timings& out
 #elif UAVCAN_STM32_NUTTX
     const uavcan::uint32_t pclk = STM32_PCLK1_FREQUENCY;
 #elif UAVCAN_STM32_CVRA_PLATFORM
-    const uavcan::uint32_t plck = rcc_ppre1_frequency;
+    const uavcan::uint32_t pclk = rcc_ppre1_frequency;
 #else
 # error "Unknown OS"
 #endif
@@ -659,7 +659,7 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         RCC->APB1RSTR &= ~RCC_APB1RSTR_CAN1RST;
 #elif UAVCAN_STM32_CVRA_PLATFORM
         rcc_periph_clock_enable(RCC_CAN1);
-        rcc_periph_reset_pulse(RCC_CAN1);
+        rcc_periph_reset_pulse(RST_CAN1);
 #endif
     }
 
@@ -688,7 +688,7 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         RCC->APB1RSTR &= ~RCC_APB1RSTR_CAN2RST;
 # elif UAVCAN_STM32_CVRA_PLATFORM
         rcc_periph_clock_enable(RCC_CAN2);
-        rcc_periph_reset_pulse(RCC_CAN2);
+        rcc_periph_reset_pulse(RST_CAN2);
 # endif
     }
 

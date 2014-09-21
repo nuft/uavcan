@@ -16,6 +16,7 @@
 # include <cstring>
 #elif UAVCAN_STM32_CVRA_PLATFORM
 # include <platform-abstraction/threading.h>
+# include <platform-abstraction/mutex.h>
 # include <platform-abstraction/semaphore.h>
 #else
 # error "Unknown OS"
