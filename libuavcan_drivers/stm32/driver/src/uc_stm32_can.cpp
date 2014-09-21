@@ -14,6 +14,9 @@
 # include <nuttx/arch.h>
 # include <nuttx/irq.h>
 # include <arch/board/board.h>
+#elif UAVCAN_STM32_CVRA_PLATFORM
+# include <libopencm3/stm32/rcc.h>
+# include <libopencm3/dispatch/nvic.h>
 #else
 # error "Unknown OS"
 #endif
@@ -170,6 +173,8 @@ int CanIface::computeTimings(const uavcan::uint32_t target_bitrate, Timings& out
     const uavcan::uint32_t pclk = STM32_PCLK1;
 #elif UAVCAN_STM32_NUTTX
     const uavcan::uint32_t pclk = STM32_PCLK1_FREQUENCY;
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    const uavcan::uint32_t plck = rcc_ppre1_frequency;
 #else
 # error "Unknown OS"
 #endif
@@ -648,10 +653,13 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         modifyreg32(STM32_RCC_APB1ENR, 0, RCC_APB1ENR_CAN1EN);
         modifyreg32(STM32_RCC_APB1RSTR, 0, RCC_APB1RSTR_CAN1RST);
         modifyreg32(STM32_RCC_APB1RSTR, RCC_APB1RSTR_CAN1RST, 0);
-#else
+#elif UAVCAN_STM32_CHIBIOS
         RCC->APB1ENR  |=  RCC_APB1ENR_CAN1EN;
         RCC->APB1RSTR |=  RCC_APB1RSTR_CAN1RST;
         RCC->APB1RSTR &= ~RCC_APB1RSTR_CAN1RST;
+#elif UAVCAN_STM32_CVRA_PLATFORM
+        rcc_periph_clock_enable(RCC_CAN1);
+        rcc_periph_reset_pulse(RCC_CAN1);
 #endif
     }
 
@@ -674,10 +682,13 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         modifyreg32(STM32_RCC_APB1ENR, 0, RCC_APB1ENR_CAN2EN);
         modifyreg32(STM32_RCC_APB1RSTR, 0, RCC_APB1RSTR_CAN2RST);
         modifyreg32(STM32_RCC_APB1RSTR, RCC_APB1RSTR_CAN2RST, 0);
-# else
+# elif UAVCAN_STM32_CHIBIOS
         RCC->APB1ENR  |=  RCC_APB1ENR_CAN2EN;
         RCC->APB1RSTR |=  RCC_APB1RSTR_CAN2RST;
         RCC->APB1RSTR &= ~RCC_APB1RSTR_CAN2RST;
+# elif UAVCAN_STM32_CVRA_PLATFORM
+        rcc_periph_clock_enable(RCC_CAN2);
+        rcc_periph_reset_pulse(RCC_CAN2);
 # endif
     }
 
@@ -714,7 +725,7 @@ int CanDriver::init(uavcan::uint32_t bitrate)
     IRQ_ATTACH(STM32_IRQ_CAN2RX1, can2_irq);
 # endif
 # undef IRQ_ATTACH
-#else
+#elif UAVCAN_STM32_CHIBIOS
     {
         CriticalSectionLocker lock;
         nvicEnableVector(CAN1_TX_IRQn,  UAVCAN_STM32_IRQ_PRIORITY_MASK);
@@ -726,6 +737,21 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         nvicEnableVector(CAN2_RX1_IRQn, UAVCAN_STM32_IRQ_PRIORITY_MASK);
 # endif
     }
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    nvic_enable_irq(NVIC_CAN1_TX_IRQ);
+    nvic_set_priority(NVIC_CAN1_TX_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+    nvic_enable_irq(NVIC_CAN1_RX0_IRQ);
+    nvic_set_priority(NVIC_CAN1_RX0_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+    nvic_enable_irq(NVIC_CAN1_RX1_IRQ);
+    nvic_set_priority(NVIC_CAN1_RX1_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+# if UAVCAN_STM32_NUM_IFACES > 1
+    nvic_enable_irq(NVIC_CAN2_TX_IRQ);
+    nvic_set_priority(NVIC_CAN2_TX_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+    nvic_enable_irq(NVIC_CAN2_RX0_IRQ);
+    nvic_set_priority(NVIC_CAN2_RX0_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+    nvic_enable_irq(NVIC_CAN2_RX1_IRQ);
+    nvic_set_priority(NVIC_CAN2_RX1_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
+# endif
 #endif
 
     UAVCAN_STM32_LOG("CAN drv init OK");
@@ -744,10 +770,21 @@ fail:
 # if UAVCAN_STM32_NUM_IFACES > 1
     modifyreg32(STM32_RCC_APB1ENR, RCC_APB1ENR_CAN2EN, 0);
 # endif
-#else
+#elif UAVCAN_STM32_CHIBIOS
     RCC->APB1ENR &= ~RCC_APB1ENR_CAN1EN;
 # if UAVCAN_STM32_NUM_IFACES > 1
     RCC->APB1ENR &= ~RCC_APB1ENR_CAN2EN;
+# endif
+#elif UAVCAN_STM32_CVRA_PLATFORM
+    rcc_periph_clock_disable(RCC_CAN1);
+    nvic_disable_irq(NVIC_CAN1_TX_IRQ);
+    nvic_disable_irq(NVIC_CAN1_RX0_IRQ);
+    nvic_disable_irq(NVIC_CAN1_RX1_IRQ);
+# if UAVCAN_STM32_NUM_IFACES > 1
+    rcc_periph_clock_disable(RCC_CAN2);
+    nvic_disable_irq(NVIC_CAN2_TX_IRQ);
+    nvic_disable_irq(NVIC_CAN2_RX0_IRQ);
+    nvic_disable_irq(NVIC_CAN2_RX1_IRQ);
 # endif
 #endif
     return res;
@@ -826,7 +863,7 @@ static int can2_irq(const int irq, void*)
 }
 
 # endif
-#else // UAVCAN_STM32_NUTTX
+#elif UAVCAN_STM32_NUTTX
 
 UAVCAN_STM32_IRQ_HANDLER(CAN1_TX_IRQHandler)
 {
@@ -873,6 +910,41 @@ UAVCAN_STM32_IRQ_HANDLER(CAN2_RX1_IRQHandler)
 }
 
 # endif
-#endif // UAVCAN_STM32_NUTTX
+#elif UAVCAN_STM32_CVRA_PLATFORM
+
+void can1_tx_isr(void)
+{
+    uavcan_stm32::handleTxInterrupt(0);
+}
+
+void can1_rx0_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(0, 0);
+}
+
+void can1_rx1_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(0, 1);
+}
+
+# if UAVCAN_STM32_NUM_IFACES > 1
+
+void can2_tx_isr(void)
+{
+    uavcan_stm32::handleTxInterrupt(1);
+}
+
+void can2_rx0_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(1, 0);
+}
+
+void can2_rx1_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(1, 1);
+}
+
+# endif
+#endif
 
 } // extern "C"

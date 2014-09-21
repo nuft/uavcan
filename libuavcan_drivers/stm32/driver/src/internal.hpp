@@ -9,6 +9,8 @@
 #elif UAVCAN_STM32_NUTTX
 # include <nuttx/arch.h>
 # include <syslog.h>
+#elif UAVCAN_STM32_CVRA_PLATFORM
+# include <platform-abstraction/criticalsection.h>
 #else
 # error "Unknown OS"
 #endif
@@ -52,6 +54,11 @@
 # endif
 #endif
 
+#if UAVCAN_STM32_CVRA_PLATFORM
+# ifndef UAVCAN_STM32_IRQ_PRIORITY_MASK
+#  define UAVCAN_STM32_IRQ_PRIORITY_MASK 23 //TODO
+# endif
+#endif
 /**
  * Any General-Purpose timer (TIM2, TIM3, TIM4, TIM5)
  * e.g. -DUAVCAN_STM32_TIMER_NUMBER=2
@@ -93,6 +100,23 @@ struct CriticalSectionLocker
     ~CriticalSectionLocker()
     {
         irqrestore(flags_);
+    }
+};
+
+#elif UAVCAN_STM32_CVRA_PLATFORM
+
+struct CriticalSectionLocker
+{
+    CRITICAL_SECTION_ALLOC();
+
+    CriticalSectionLocker()
+    {
+        CRITICAL_SECTION_ENTER();
+    }
+
+    ~CriticalSectionLocker()
+    {
+        CRITICAL_SECTION_EXIT();
     }
 };
 
