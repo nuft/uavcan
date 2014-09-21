@@ -15,8 +15,8 @@
 # include <ctime>
 # include <cstring>
 #elif UAVCAN_STM32_CVRA_PLATFORM
-# include <platform-abstractin/threading.h>
-# include <platform-abstractin/semaphore.h>
+# include <platform-abstraction/threading.h>
+# include <platform-abstraction/semaphore.h>
 #else
 # error "Unknown OS"
 #endif
