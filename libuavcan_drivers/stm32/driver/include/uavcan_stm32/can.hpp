@@ -194,9 +194,9 @@ public:
     template <unsigned RxQueueCapacity>
     CanDriver(CanRxItem (&rx_queue_storage)[UAVCAN_STM32_NUM_IFACES][RxQueueCapacity])
         : update_event_(*this)
-        , if0_(bxcan::Can[0], update_event_, 0, rx_queue_storage[0], RxQueueCapacity)
+        , if0_(bxcan::Can[UAVCAN_STM32_PRIMARY_INTERFACE - 1], update_event_, 0, rx_queue_storage[0], RxQueueCapacity)
 #if UAVCAN_STM32_NUM_IFACES > 1
-        , if1_(bxcan::Can[1], update_event_, 1, rx_queue_storage[1], RxQueueCapacity)
+        , if1_(bxcan::Can[UAVCAN_STM32_SECONDARY_INTERFACE - 1], update_event_, 1, rx_queue_storage[1], RxQueueCapacity)
 #endif
     {
         uavcan::StaticAssert<(RxQueueCapacity <= CanIface::MaxRxQueueCapacity)>::check();

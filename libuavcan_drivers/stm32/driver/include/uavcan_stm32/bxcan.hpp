@@ -21,6 +21,14 @@
 # error UAVCAN_STM32_NUM_IFACES
 #endif
 
+#ifndef UAVCAN_STM32_PRIMARY_INTERFACE
+# define UAVCAN_STM32_PRIMARY_INTERFACE 1
+#endif
+#if !(UAVCAN_STM32_PRIMARY_INTERFACE == 1 || UAVCAN_STM32_PRIMARY_INTERFACE == 2)
+# error "Primary CAN interface must be 1 or 2"
+#endif
+#define UAVCAN_STM32_SECONDARY_INTERFACE (3 - UAVCAN_STM32_PRIMARY_INTERFACE)
+
 namespace uavcan_stm32
 {
 namespace bxcan
@@ -77,13 +85,10 @@ struct CanType
 /**
  * CANx register sets
  */
-CanType* const Can[UAVCAN_STM32_NUM_IFACES] =
+CanType* const Can[] =
 {
-    reinterpret_cast<CanType*>(0x40006400)
-#if UAVCAN_STM32_NUM_IFACES > 1
-    ,
+    reinterpret_cast<CanType*>(0x40006400),
     reinterpret_cast<CanType*>(0x40006800)
-#endif
 };
 
 /* CAN master control register */

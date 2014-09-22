@@ -395,29 +395,36 @@ int CanIface::init(uavcan::uint32_t bitrate)
      */
     if (self_index_ == 0)
     {
-        can_->FMR |= bxcan::FMR_FINIT;
+        bxcan::Can[0]->FMR |= bxcan::FMR_FINIT;
 
-        can_->FMR &= 0xFFFFC0F1;
-        can_->FMR |= static_cast<uavcan::uint32_t>(NumFilters) << 8;  // Slave (CAN2) gets half of the filters
+        bxcan::Can[0]->FMR &= 0xFFFFC0F1;
+        bxcan::Can[0]->FMR |= static_cast<uavcan::uint32_t>(NumFilters) << 8;  // Slave (CAN2) gets half of the filters
 
-        can_->FFA1R = 0;                           // All assigned to FIFO0 by default
-        can_->FM1R = 0;                            // Indentifier Mask mode
+        bxcan::Can[0]->FFA1R = 0;                           // All assigned to FIFO0 by default
+        bxcan::Can[0]->FM1R = 0;                            // Indentifier Mask mode
 
 #if UAVCAN_STM32_NUM_IFACES > 1
-        can_->FS1R = 0x7ffffff;                    // Single 32-bit for all
-        can_->FilterRegister[0].FR1 = 0;          // CAN1 accepts everything
-        can_->FilterRegister[0].FR2 = 0;
-        can_->FilterRegister[NumFilters].FR1 = 0; // CAN2 accepts everything
-        can_->FilterRegister[NumFilters].FR2 = 0;
-        can_->FA1R = 1 | (1 << NumFilters);        // One filter per each iface
+        bxcan::Can[0]->FS1R = 0x7ffffff;                    // Single 32-bit for all
+        bxcan::Can[0]->FilterRegister[0].FR1 = 0;          // CAN1 accepts everything
+        bxcan::Can[0]->FilterRegister[0].FR2 = 0;
+        bxcan::Can[0]->FilterRegister[NumFilters].FR1 = 0; // CAN2 accepts everything
+        bxcan::Can[0]->FilterRegister[NumFilters].FR2 = 0;
+        bxcan::Can[0]->FA1R = 1 | (1 << NumFilters);        // One filter per each iface
 #else
-        can_->FS1R = 0x1fff;
-        can_->FilterRegister[0].FR1 = 0;
-        can_->FilterRegister[0].FR2 = 0;
-        can_->FA1R = 1;
+# if UAVCAN_STM32_PRIMARY_INTERFACE == 1
+        bxcan::Can[0]->FS1R = 0x1fff;
+        bxcan::Can[0]->FilterRegister[0].FR1 = 0;
+        bxcan::Can[0]->FilterRegister[0].FR2 = 0;
+        bxcan::Can[0]->FA1R = 1;
+# else // UAVCAN_STM32_PRIMARY_INTERFACE == 2
+        bxcan::Can[0]->FS1R = 0x7ffe000;
+        bxcan::Can[0]->FilterRegister[NumFilters].FR1 = 0;
+        bxcan::Can[0]->FilterRegister[NumFilters].FR2 = 0;
+        bxcan::Can[0]->FA1R = 1 << NumFilters;
+# endif
 #endif
 
-        can_->FMR &= ~bxcan::FMR_FINIT;
+        bxcan::Can[0]->FMR &= ~bxcan::FMR_FINIT;
     }
 
 leave:
@@ -646,9 +653,7 @@ int CanDriver::init(uavcan::uint32_t bitrate)
 
     UAVCAN_STM32_LOG("Bitrate %lu", static_cast<unsigned long>(bitrate));
 
-    /*
-     * CAN1
-     */
+    /* CAN1 */
     {
         CriticalSectionLocker lock;
 #if UAVCAN_STM32_NUTTX
@@ -665,19 +670,8 @@ int CanDriver::init(uavcan::uint32_t bitrate)
 #endif
     }
 
-    UAVCAN_STM32_LOG("Initing iface 0...");
-    res = if0_.init(bitrate);
-    if (res < 0)
-    {
-        UAVCAN_STM32_LOG("Iface 0 init failed %i", res);
-        goto fail;
-    }
-    ifaces[0] = &if0_;
-
-    /*
-     * CAN2
-     */
-#if UAVCAN_STM32_NUM_IFACES > 1
+#if (UAVCAN_STM32_PRIMARY_INTERFACE == 2) || (UAVCAN_STM32_NUM_IFACES > 1)
+    /* CAN2 */
     {
         CriticalSectionLocker lock;
 # if UAVCAN_STM32_NUTTX
@@ -693,7 +687,18 @@ int CanDriver::init(uavcan::uint32_t bitrate)
         rcc_periph_reset_pulse(RST_CAN2);
 # endif
     }
+#endif
 
+    UAVCAN_STM32_LOG("Initing iface 0...");
+    res = if0_.init(bitrate);
+    if (res < 0)
+    {
+        UAVCAN_STM32_LOG("Iface 0 init failed %i", res);
+        goto fail;
+    }
+    ifaces[0] = &if0_;
+
+#if UAVCAN_STM32_NUM_IFACES > 1
     UAVCAN_STM32_LOG("Initing iface 1...");
     res = if1_.init(bitrate);
     if (res < 0)
@@ -740,13 +745,15 @@ int CanDriver::init(uavcan::uint32_t bitrate)
 # endif
     }
 #elif UAVCAN_STM32_CVRA_PLATFORM
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
     nvic_enable_irq(NVIC_CAN1_TX_IRQ);
     nvic_set_priority(NVIC_CAN1_TX_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
     nvic_enable_irq(NVIC_CAN1_RX0_IRQ);
     nvic_set_priority(NVIC_CAN1_RX0_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
     nvic_enable_irq(NVIC_CAN1_RX1_IRQ);
     nvic_set_priority(NVIC_CAN1_RX1_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
-# if UAVCAN_STM32_NUM_IFACES > 1
+# endif
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 2)
     nvic_enable_irq(NVIC_CAN2_TX_IRQ);
     nvic_set_priority(NVIC_CAN2_TX_IRQ, UAVCAN_STM32_IRQ_PRIORITY_MASK);
     nvic_enable_irq(NVIC_CAN2_RX0_IRQ);
@@ -778,11 +785,13 @@ fail:
     RCC->APB1ENR &= ~RCC_APB1ENR_CAN2EN;
 # endif
 #elif UAVCAN_STM32_CVRA_PLATFORM
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
     rcc_periph_clock_disable(RCC_CAN1);
     nvic_disable_irq(NVIC_CAN1_TX_IRQ);
     nvic_disable_irq(NVIC_CAN1_RX0_IRQ);
     nvic_disable_irq(NVIC_CAN1_RX1_IRQ);
-# if UAVCAN_STM32_NUM_IFACES > 1
+# endif
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 2)
     rcc_periph_clock_disable(RCC_CAN2);
     nvic_disable_irq(NVIC_CAN2_TX_IRQ);
     nvic_disable_irq(NVIC_CAN2_RX0_IRQ);
@@ -914,6 +923,8 @@ UAVCAN_STM32_IRQ_HANDLER(CAN2_RX1_IRQHandler)
 # endif
 #elif UAVCAN_STM32_CVRA_PLATFORM
 
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
+
 void can1_tx_isr(void)
 {
     uavcan_stm32::handleTxInterrupt(0);
@@ -929,7 +940,8 @@ void can1_rx1_isr(void)
     uavcan_stm32::handleRxInterrupt(0, 1);
 }
 
-# if UAVCAN_STM32_NUM_IFACES > 1
+# endif
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 2)
 
 void can2_tx_isr(void)
 {
