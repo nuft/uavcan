@@ -114,6 +114,7 @@ class Mutex
     mutex_t mutex_;
 
 public:
+    Mutex() {os_mutex_init(&mutex_);};
     void lock();
     void unlock();
 };
