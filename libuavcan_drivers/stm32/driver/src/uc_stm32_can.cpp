@@ -320,7 +320,7 @@ uavcan::int16_t CanIface::configureFilters(const uavcan::CanFilterConfig* filter
 
 bool CanIface::waitMsrINakBitStateChange(bool target_state)
 {
-#if UAVCAN_STM32_NUTTX
+#if UAVCAN_STM32_NUTTX || UAVCAN_STM32_CVRA_PLATFORM
     const unsigned Timeout = 500;
 #else
     const unsigned Timeout = 2000000;
@@ -334,6 +334,8 @@ bool CanIface::waitMsrINakBitStateChange(bool target_state)
         }
 #if UAVCAN_STM32_NUTTX
         ::usleep(2000);
+#elif UAVCAN_STM32_CVRA_PLATFORM
+        os_thread_sleep_us(2000);
 #endif
     }
     return false;
