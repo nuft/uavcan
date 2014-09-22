@@ -923,41 +923,61 @@ UAVCAN_STM32_IRQ_HANDLER(CAN2_RX1_IRQHandler)
 # endif
 #elif UAVCAN_STM32_CVRA_PLATFORM
 
-# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
-
+# if (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
 void can1_tx_isr(void)
 {
     uavcan_stm32::handleTxInterrupt(0);
 }
-
 void can1_rx0_isr(void)
 {
     uavcan_stm32::handleRxInterrupt(0, 0);
 }
-
 void can1_rx1_isr(void)
 {
     uavcan_stm32::handleRxInterrupt(0, 1);
 }
-
 # endif
-# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 2)
-
+# if (UAVCAN_STM32_NUM_IFACES > 1) && (UAVCAN_STM32_PRIMARY_INTERFACE != 1)
+void can1_tx_isr(void)
+{
+    uavcan_stm32::handleTxInterrupt(1);
+}
+void can1_rx0_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(1, 0);
+}
+void can1_rx1_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(1, 1);
+}
+# endif
+# if (UAVCAN_STM32_PRIMARY_INTERFACE == 2)
+void can2_tx_isr(void)
+{
+    uavcan_stm32::handleTxInterrupt(0);
+}
+void can2_rx0_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(0, 0);
+}
+void can2_rx1_isr(void)
+{
+    uavcan_stm32::handleRxInterrupt(0, 1);
+}
+# endif
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE != 2)
 void can2_tx_isr(void)
 {
     uavcan_stm32::handleTxInterrupt(1);
 }
-
 void can2_rx0_isr(void)
 {
     uavcan_stm32::handleRxInterrupt(1, 0);
 }
-
 void can2_rx1_isr(void)
 {
     uavcan_stm32::handleRxInterrupt(1, 1);
 }
-
 # endif
 #endif
 
