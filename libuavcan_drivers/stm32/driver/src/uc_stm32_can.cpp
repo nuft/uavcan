@@ -777,6 +777,7 @@ fail:
 # endif
 #elif UAVCAN_STM32_CVRA_PLATFORM
     rcc_periph_clock_disable(RCC_CAN1);
+# if (UAVCAN_STM32_NUM_IFACES > 1) || (UAVCAN_STM32_PRIMARY_INTERFACE == 1)
     nvic_disable_irq(NVIC_CAN1_TX_IRQ);
     nvic_disable_irq(NVIC_CAN1_RX0_IRQ);
     nvic_disable_irq(NVIC_CAN1_RX1_IRQ);
