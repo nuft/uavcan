@@ -1,0 +1,7 @@
+#
+# CVRA Service test
+#
+
+uint32 request_data
+---
+uint32 response_data
